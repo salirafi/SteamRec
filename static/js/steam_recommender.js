@@ -7,7 +7,7 @@ const INITIAL_WEIGHTS = {
   similarity: 0.65,
 };
 
-const PROJECT_REPO_URL = "https://github.com/salirafi/Steam-Recommender";
+const PROJECT_REPO_URL = "https://github.com/salirafi/SteamRec";
 const STEAM_ICON_URL = "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg";
 
 const RATING_MAP = {
