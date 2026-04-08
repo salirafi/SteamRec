@@ -10,7 +10,7 @@ For excellent exercise on building a recommender system from scratch with Python
 At its heart, a recommender system relies on two types of data: the items and user interactions (for collaborative-filtering technique). In this project, items are games available on Steam whilst user interactions could take various forms such as whether the user recommends the game, their total playtime, what's in their wishlist, etc. For content-based filtering technique, the recommender will filter, out of the whole catalog, games that are most similar to the game in question based on their contents such as tags and genres. For collaborative-filtering technique, the recommender will evaluate whether a user would like a game based on other similar users that play similar games.
 
 The recommender system is based originally on [Game Recommendations on Steam Dataset from Kaggle](https://www.kaggle.com/datasets/antonkozyriev/game-recommendations-on-steam) (per 2022) 
-    > This dataset covers almost all games until year 2022 and contains more than 41 million user reviews and 50,000 games.
+> This dataset covers almost all games until year 2022 and contains more than 41 million user reviews and 50,000 games.
 
 The database will be updated to up to 2026 in the future.
 
@@ -170,15 +170,15 @@ The content-based recommender works only from item metadata and does not require
 
 Here, $\mathbf{a}$ and $\mathbf{b}$ are the feature vectors of two games. Since the vectors are normalized before similarity is computed, the cosine score measures how similar the two games are in terms of their tag profiles.
 
-The content-based pipeline is:
+The content-based pipeline is then:
 
 1. Build a sparse tag matrix for all games and normalize each row.
-2. For each game, compute cosine similarity against the rest of the catalog and keep only the top-$k$ most similar items. This stores roughly $n_{\text{games}} \times k$ item-item similarity rows rather than the full dense matrix.
+2. For each game, compute cosine similarity against the rest of the catalog and keep only the top $k$ most similar items. This stores roughly $n_{\text{games}} \times k$ item-item similarity rows rather than the full dense matrix.
 3. Compute three additional item-level scores used for re-ranking:
    - Popularity score, derived from the log-transformed number of user reviews.
    - Quality score, derived from the positive review ratio.
    - Age score, derived from the inverse of the game's age, so newer games receive a higher score.
-4. Re-rank the top-$k$ similar items using a weighted sum. In the implementation, the base similarity score is normalized before being combined with the other re-rank features:
+4. Re-rank the top $k$ similar items using a weighted sum. In the implementation, the base similarity score is normalized before being combined with the other re-rank features:
 
 ```math
 \text{final\_score}_i
@@ -197,7 +197,7 @@ where $\hat{s}_i$ is the normalized similarity score for candidate item $i$, $p_
 
 The collaborative-filtering recommender learns from user-item interactions rather than game metadata. The implementation uses [ALS](https://github.com/benfred/implicit) for implicit-feedback recommendation, following the framework introduced by [Hu, Koren, and Volinsky (2008)](http://yifanhu.net/PUB/cf.pdf).
 
-Instead of explicit ratings, the model uses interaction strength derived from playtime and the binary recommend flag in the Kaggle review dataset. For each observed user-game pair $(u, i)$, the project builds an interaction score:
+Instead of explicit ratings, the model uses interaction strength derived from playtime and the binary recommend flag in the review dataset. For each observed user-game pair $(u, i)$, the pipeline builds an interaction score:
 
 ```math
 r_{ui} = \log(1 + h_{ui}) \, m_{ui}
@@ -221,12 +221,13 @@ c_{ui} = 1 + \alpha r_{ui}
 
 This produces a sparse confidence matrix whose shape is $(n_{\text{users}}, n_{\text{items}})$.
 
-The collaborative-filtering pipeline is:
+The collaborative-filtering pipeline is then:
 
 1. Build the interaction score $r_{ui}$ from playtime and the recommendation flag.
 2. Convert it into an implicit-feedback confidence matrix using $c_{ui} = 1 + \alpha r_{ui}$.
-3. Train ALS to learn latent factors for users and items. In practice, the deployed application stores only the item latent factors and reconstructs a live user's latent vector at request time.
-4. When a user enters a Steam ID, fetch their owned games from the [Steam Web API: `IPlayerService/GetOwnedGames`](https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/). Since this endpoint provides ownership and playtime but not review recommendations, the current online pipeline treats owned games as positive interactions when forming live inputs.
+3. Train ALS to learn latent factors for users and items. In practice, the pipeline stores only the item latent factors and reconstructs a live user's latent vector at request time.
+4. When a user enters a Steam ID from the web app, it will fetch their owned games from [Steam Web API: `IPlayerService/GetOwnedGames`](https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/). 
+    > ⚠️ IMPORTANT ⚠️ Since the endpoint provides ownership and playtime but not review recommendations, the current online pipeline treats owned games as positive interactions when forming live inputs. This behavior is actually not proper, used only for convenience. In the future, this will be patched.
 5. Fold the live user into the pretrained item-factor space. If $Y$ is the matrix of item latent factors, the user vector $\mathbf{x}_u$ is solved from the observed items by a regularized linear system of the form:
 
 ```math
@@ -260,7 +261,7 @@ w_{\text{cf}} \,\widehat{\text{cf\_score}}_i
 + w_{\text{age}} \, a_i
 ```
 
-where the collaborative-filtering score is normalized before it is combined with the popularity, quality, and age signals.
+where the collaborative-filtering score is normalized before it is combined with the popularity, quality, and age parameters.
 
 > In short, the collaborative model first captures user taste in a latent space, then the final ranking layer makes the output more practical by balancing personalization with popularity, review quality, and recency.
 

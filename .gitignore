@@ -13,6 +13,10 @@ __pycache__/
 *.npy
 *.zip
 
+!savefiles/item_id_to_idx_als.json
+!savefiles/items_used.parquet
+!savefiles/item_factors.npy
+
 src/___*
 
 sql_script/generated/
