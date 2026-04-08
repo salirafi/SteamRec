@@ -2,7 +2,7 @@
 
 This repository contains the source code of a recommender system for the popular game store [Steam](https://store.steampowered.com/about/) using a combination of collaborative and content-based filtering technique, made with Python. It covers an end-to-end pipeline from data collection to web app building. 
 
-![\figures\home_page.png](\figures\home_page.png)
+![/figures/home_page.png](/figures/home_page.png)
 
 
 ## Introduction
