@@ -55,14 +55,14 @@ QUERY_CONFIG = {
             g.item_id,
             g.item_name,
             g.release_date,
-            g.positive_ratio,
+            g.rating,
             g.user_reviews,
             GROUP_CONCAT(DISTINCT t.tag ORDER BY t.tag SEPARATOR ' | ') AS tags
         FROM GAME_DATA g
         LEFT JOIN GAME_TAG t ON g.item_id = t.item_id
         GROUP BY
             g.item_id, g.item_name, g.release_date,
-            g.positive_ratio, g.user_reviews
+            g.rating, g.user_reviews
         ORDER BY g.item_id
     """,
 

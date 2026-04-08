@@ -459,7 +459,7 @@ function App() {
           <div>
             <div className="hero-title">SteamRec</div>
             <div className="hero-sub">User and Game Based Steam Recommendations</div>
-            <div className="hero-sub-sub">Current database is up to 2022. Will be updated in the next version.</div>
+            {/* <div className="hero-sub-sub">Current database is up to 2022. Will be updated in the next version.</div> */}
           </div>
 
           <div className="search-wrap">
@@ -476,7 +476,7 @@ function App() {
               <input
                 className="search-input"
                 type="text"
-                placeholder={mode === "user" ? "Enter Steam User ID" : "Type a game name"}
+                placeholder={mode === "user" ? "Enter Steam 64-bit user ID" : "Type a game name & pick one below"}
                 value={inputValue}
                 onChange={(event) => handleInputChange(event.target.value)}
                 onKeyDown={handleKey}
@@ -500,9 +500,13 @@ function App() {
             )}
 
             <div className={`status-message${error ? " error-message" : ""}`}>
-              {mode === "user"
-                ? "Enter a Steam 64-bit user ID."
-                : "Type a game name choose one from below."}
+              {/* {mode === "user"
+                ? "Game database is per 2022. This will be updated in the future versions."
+                : "Game database is per 2022. This will be updated in the future versions."} */}
+              <span>Game database is per 2022.</span>
+            </div>
+            <div className={`status-message${error ? " error-message" : ""} status-message-sub`}>
+              <span>This will be updated in future versions.</span>
             </div>
           </div>
         </div>
@@ -563,28 +567,28 @@ function App() {
 
             <SliderRow
               label="Popularity"
-              desc="Prefer games that are more popular based on player counts and trends."
+              desc="Higher values will prefer games that are more popular based on user reviews."
               value={weights.popularity}
               onChange={setWeight("popularity")}
               onRelease={handleWeightRelease}
             />
             <SliderRow
               label="Quality"
-              desc="Prefer games with better user reviews and ratings."
+              desc="Higher values will prefer games with better ratings."
               value={weights.quality}
               onChange={setWeight("quality")}
               onRelease={handleWeightRelease}
             />
             <SliderRow
               label="Recency"
-              desc="Prefer newer games or older classics."
+              desc="Higher values will prefer newer games."
               value={weights.age}
               onChange={setWeight("age")}
               onRelease={handleWeightRelease}
             />
             <SliderRow
               label="Similarity"
-              desc="Prefer games more similar to the search context based on tags and player overlap."
+              desc="Higher values will prefer games more similar in tags of the selected game."
               value={weights.similarity}
               onChange={setWeight("similarity")}
               onRelease={handleWeightRelease}

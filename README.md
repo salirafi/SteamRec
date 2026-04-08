@@ -2,6 +2,8 @@
 
 This repository contains the source code of a recommender system for the popular game store [Steam](https://store.steampowered.com/about/) using a combination of collaborative and content-based filtering technique, made with Python. It covers an end-to-end pipeline from data collection to web app building. 
 
+![\figures\home_page.png](\figures\home_page.png)
+
 
 ## Introduction
 
@@ -62,13 +64,13 @@ python ./src/prepare_production_tables.py
 
 rsync -a ".\tables\production" "\Path\to\MySQL\MySQL Server 8.0\Uploads" -v -u
 
-mysql --user --password --host --port -e "source sql_script\load_production_tables.sql"
+mysql --user root --password --host localhost --port 3306 -e "source sql_script\load_production_tables.sql"
 
 python ./src/prepare_recommender_matrices.py
 
 rsync -a ".\tables\rec_matrices" "\Path\to\MySQL\MySQL Server 8.0\Uploads" -v -u
 
-mysql --user --password --host --port -e "source sql_script\load_rec_query_from_csv.sql"
+mysql --user root --password --host localhost --port 3306 -e "source sql_script\load_rec_query_from_csv.sql"
 
 python app.py
 ```

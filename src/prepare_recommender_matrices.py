@@ -275,17 +275,17 @@ def fit_items(items_df: pd.DataFrame) -> tuple[pd.DataFrame, sparse.csr_matrix, 
 
 # this build item score for re-ranking based on popularity, quality, and recency
 def build_item_score(items_df: pd.DataFrame) -> pd.DataFrame:
-    df = items_df[["item_id", "user_reviews", "positive_ratio", "game_age_inv"]].copy()
+    df = items_df[["item_id", "user_reviews", "rating", "game_age_inv"]].copy()
 
     df["user_reviews"] = pd.to_numeric(df["user_reviews"], errors="coerce").fillna(int(0))  # fill missing review counts with zero
-    df["positive_ratio"] = pd.to_numeric(df["positive_ratio"], errors="coerce").fillna(int(50))  # fill missing positive ratios with 50%
+    df["rating"] = pd.to_numeric(df["rating"], errors="coerce").fillna(int(0))  # fill missing ratings 0
     df["game_age_inv"] = pd.to_numeric(df["game_age_inv"], errors="coerce")  # inverse of age to give more weight to newer games
 
     # popularity
     df["pop_score"] = _safe_minmax(np.log1p(df["user_reviews"]))  # apply log transformation
 
     # quality
-    df["quality_score"] = _safe_minmax(df["positive_ratio"])  # normalize to [0,1] range
+    df["quality_score"] = _safe_minmax(df["rating"])  # normalize to [0,1] range
 
     # normalized game age
     df["age_score"] = _safe_minmax(df["game_age_inv"])  # normalize to [0,1] range

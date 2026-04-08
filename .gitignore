@@ -24,8 +24,6 @@ sql_script/*_cloud.sql
 
 scripts/
 
-figures/_*
-
 staging_checks.md
 staging_tables_summary.md
 
