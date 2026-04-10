@@ -288,6 +288,6 @@ Pipeline-specific implementation:
 
 This is a personal project intended to be a portfolio. I am not currently planning to push into production except if there are some interested collaborators, in which case, please feel free to contact me at salirafi8@gmail.com :)
 
-The use of generative AI includes: Github Copilot to help in code syntax and comments/docstring writing, as well as OpenAI's Chat GPT to help with identifying bugs and errors, and to also write the `.ps1` scripts per my guidance. Outside of those, including problem formulation and framework of thinking, code logical reasoning and writing, from database management to web development, all is done mostly by the author.
+The use of generative AI includes: Github Copilot to help in code syntax, identifying bugs and errors, and to also write the `.ps1` scripts per my guidance. Outside of those, including problem formulation and framework of thinking, code logical reasoning and writing, from database management to web development, all is done mostly by the author.
 
 
