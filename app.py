@@ -1,47 +1,42 @@
-from pathlib import Path
+#!/usr/bin/env python3
+
 from dataclasses import dataclass
-import ast
 import re
-import os
 import time
 import uuid
 from threading import Lock
 
-import numpy as np
-from sqlalchemy import create_engine
+import pandas as pd
+from sqlalchemy import create_engine, text
 from flask import Flask, request, jsonify, render_template
 from src._get_steam_API import fetch_owned_games_df
-from src.config import get_db_url, PATHS
+from src.config import DB_CONFIG, get_db_url, RECOMMENDER_CONFIG, MAP_LABEL
+from src.helpers import split_pipe_values, load_runtime
 from src.recommender import (
     build_cb_candidates,
     build_cf_candidates,
-    load_runtime,
     rerank_candidates,
 )
-import src.recommender as recommender_service
 
 app = Flask(__name__)
 
-OUTPUT_DIR = PATHS["output_dir"]
-DEFAULT_TOP_N = 15 # number of recommendations to return; adjust based on UI design and performance considerations
-DEFAULT_CB_POOL_SIZE = 100 # number of similar games to fetch from the database for re-ranking in game-based search; adjust based on expected performance and recommendation quality tradeoff
+DEFAULT_TOP_N = RECOMMENDER_CONFIG["top_n"] # number of recommendations to return; adjust based on UI design and performance considerations
+DEFAULT_CB_POOL_SIZE = RECOMMENDER_CONFIG["candidate_pool_size"] # number of similar games to fetch from the database for re-ranking in game-based search; adjust based on expected performance and recommendation quality tradeoff
 CACHE_TTL_SECONDS = 30 * 60 # 30 minutes TTL for cached search results; adjust based on expected user behavior and performance needs
 MAX_CACHED_SEARCHES = 32 # to prevent memory bloat; adjust based on expected traffic and memory constraints
 
 
-###### !!! IMPORTANT: ############
+# =============== IMPORTANT! ===================
 
 # the web app will load the runtime from disk on startup and used it throughout the session
 # for the current game database which only contains ~50k games, this would still be manageable and fast enough
 # but if the game database grows significantly, a more dynamic loading strategy for the runtime would be necessary
-runtime = load_runtime(OUTPUT_DIR)
+runtime = load_runtime()
 
-###### !!! IMPORTANT: ############
-
-
+# ==============================================
 
 
-engine = None
+engine = create_engine(get_db_url())
 _search_cache = {}
 _search_cache_lock = Lock()
 
@@ -50,29 +45,17 @@ _search_cache_lock = Lock()
 class CachedSearch:
     search_id: str
     mode: str
-    base_score_column: str
     base_weight_key: str
     candidates_df: object
     created_at: float
     context: dict
+
 
 @app.get("/")
 def serve_index():
     return render_template("steam_recommender.html")
 
 
-# def get_engine():
-#     global engine
-#     if engine is None:
-#         host = os.getenv("STEAM_DB_HOST", "localhost")
-#         port = int(os.getenv("STEAM_DB_PORT", "3306"))
-#         user = os.getenv("STEAM_DB_USER", "root")
-#         password = os.getenv("STEAM_DB_PASSWORD", "Keppler172b!")
-#         database = os.getenv("STEAM_DB_NAME", "steam_prod")
-#         engine = create_engine(
-#             f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
-#         )
-#     return engine
 
 
 # cleanup expired cache entries based on TTL and limit total number of cached searches to prevent memory bloat
@@ -94,11 +77,12 @@ def _cleanup_search_cache(now=None):
         )
         _search_cache.pop(oldest_key, None)
 
+
 # store candidate df and search context in cache with a unique search_id
 def _store_cached_search(
     mode,
     candidates_df,
-    base_score_column,
+    # base_score_column,
     base_weight_key,
     context,
 ):
@@ -106,7 +90,7 @@ def _store_cached_search(
     cached = CachedSearch(
         search_id=search_id,
         mode=mode,
-        base_score_column=base_score_column,
+        # base_score_column=base_score_column,
         base_weight_key=base_weight_key,
         candidates_df=candidates_df.copy(),
         created_at=time.time(),
@@ -139,105 +123,34 @@ def _build_weight_overrides(mode, weights):
     overrides = {
         "w_popularity": _parse_weight_value(
             weights.get("popularity"),
-            recommender_service.config["w_popularity"],
+            RECOMMENDER_CONFIG["w_popularity"],
         ),
         "w_quality": _parse_weight_value(
             weights.get("quality"),
-            recommender_service.config["w_quality"],
+            RECOMMENDER_CONFIG["w_quality"],
         ),
         "w_age": _parse_weight_value(
             weights.get("age"),
-            recommender_service.config["w_age"],
+            RECOMMENDER_CONFIG["w_age"],
         ),
     }
     similarity_weight = _parse_weight_value(
         weights.get("similarity"),
-        recommender_service.config["w_anchor_sim"],
+        RECOMMENDER_CONFIG["w_cb"],
     )
     if mode == "user":
         overrides["w_cf"] = similarity_weight
     else:
-        overrides["w_anchor_sim"] = similarity_weight
+        overrides["w_cb"] = similarity_weight
     return overrides
 
 
 
-def rating_label(x):
-    if x is None:
-        return "Unknown"
-    try:
-        x = float(x)
-    except (TypeError, ValueError):
-        return "Unknown"
-
-    if x == 9:
-        return "Overwhelmingly Positive"
-    if x == 8:
-        return "Very Positive"
-    if x == 7:
-        return "Mostly Positive"
-    if x == 6:
-        return "Positive"
-    if x == 5:
-        return "Mixed"
-    if x == 4:
-        return "Negative"
-    if x == 3:
-        return "Mostly Negative"
-    if x == 2:
-        return "Very Negative"
-    if x == 1:
-        return "Overwhelmingly Negative"
-    return "Unknown"
-
-def split_pipe_values(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return [str(part).strip() for part in value if str(part).strip()]
-
-    if isinstance(value, tuple):
-        return [str(part).strip() for part in value if str(part).strip()]
-
-    if isinstance(value, np.ndarray):
-        return [str(part).strip() for part in value.tolist() if str(part).strip()]
-
-    text = str(value).strip()
-    if not text:
-        return []
-
-    if "|" in text:
-        return [part.strip() for part in text.split("|") if part.strip()]
-
-    if text.startswith("[") and text.endswith("]"):
-        try:
-            parsed = ast.literal_eval(text)
-            if isinstance(parsed, (list, tuple)):
-                return [str(part).strip() for part in parsed if str(part).strip()]
-        except (ValueError, SyntaxError):
-            pass
-
-        # handles numpy-style string arrays like ['2D' 'Base Building' 'City Builder']
-        quoted_parts = re.findall(r"'([^']+)'|\"([^\"]+)\"", text)
-        flattened = [part.strip() for pair in quoted_parts for part in pair if part.strip()]
-        if flattened:
-            return flattened
-
-    return [text]
-
 
 # lists of selected recommended games
 def build_recommendation_payload(recs):
-    items_meta = runtime.items_df[
-        ["item_id", "item_name", "release_date", "user_reviews", "rating", 
-         "tags", 
-        # "genres", 
-        # "developers", "publishers"
-         ]
-    ].copy()
 
-    recs = recs.merge(items_meta, on="item_id", how="left")
-    recs["rating"] = recs["rating"].apply(rating_label)
+    recs["rating"] = recs["rating"].map(MAP_LABEL).fillna("Unknown")
     recs["steamUrl"] = recs["item_id"].apply(
         lambda x: f"https://store.steampowered.com/app/{int(x)}/"
     )
@@ -251,14 +164,8 @@ def build_recommendation_payload(recs):
     recs["userReviews"] = recs["user_reviews"].fillna(0)
 
     recs["tags"] = recs["tags"].apply(split_pipe_values)
-    # recs["genres"] = recs["genres"].apply(split_pipe_values)
-    # recs["developers"] = recs["developers"].apply(split_pipe_values)
-    # recs["publishers"] = recs["publishers"].apply(split_pipe_values)
-    
-    # recs["tags"] = [["Action", "Adventure"].copy() for _ in range(len(recs))]
-    recs["genres"] = None
-    recs["developers"] = [["Unknown Developer"] for _ in range(len(recs))]
-    recs["publishers"] = [["Unknown Publisher"] for _ in range(len(recs))]
+    recs["developers"] = recs["developers"].apply(split_pipe_values)
+    recs["publishers"] = recs["publishers"].apply(split_pipe_values)
 
 
     recs = recs.reset_index(drop=True)
@@ -277,7 +184,6 @@ def build_recommendation_payload(recs):
             "rating": str(row.rating),
             "recommendationScore": float(row.recommendationScore),
             "tags": row.tags,
-            "genres": row.genres,
             "developers": row.developers,
             "publishers": row.publishers,
         })
@@ -287,7 +193,6 @@ def build_recommendation_payload(recs):
 def _build_ranked_response(cached_search, weights, top_n=DEFAULT_TOP_N, message=""):
     recs = rerank_candidates(
         candidates_df=cached_search.candidates_df,
-        base_score_column=cached_search.base_score_column,
         base_weight_key=cached_search.base_weight_key,
         top_n=top_n,
         weight_overrides=_build_weight_overrides(cached_search.mode, weights),
@@ -315,40 +220,54 @@ def build_game_suggestion_payload(rows):
 # Catalog search endpoint
 # ==========================
 
-# normalize typed game name
-def normalize_name(value):
-    return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
-# this function is used to build candidate dataframe for game-based search
-def search_game_catalog(query, limit=8):
-    normalized_query = normalize_name(query)
+# build candidate dataframe for game-based search
+def search_game_catalog(query, limit=5):
+
+    normalized_query = re.sub(r"\s+", " ", str(query or "").strip().lower()) # normalize typed game name
     if not normalized_query:
-        return runtime.items_df.iloc[0:0][["item_id", "item_name"]]
+        return pd.DataFrame(columns=["item_id", "item_name"]) # return empty dataframe if query is empty
 
-    catalog = runtime.items_df[["item_id", "item_name"]].dropna().copy()
-    catalog["normalized_name"] = catalog["item_name"].map(normalize_name)
 
-    # matching strategy:
-    starts_with = catalog["normalized_name"].str.startswith(normalized_query, na=False) # strict prefix match
-    contains = catalog["normalized_name"].str.contains(re.escape(normalized_query), na=False) # looser substring match
-    token_match = catalog["normalized_name"].map(
-        lambda name: all(token in name for token in normalized_query.split()) # token-based match; only matches if all tokens in the query are present in the name
+    # build SQL query with multiple matching strategies: prefix match, token match, and substring match; and order results by relevance
+
+    token_clauses = " AND ".join(
+        [f"LOWER(item_name) LIKE :token_{idx}" for idx, _ in enumerate(normalized_query.split())]
     )
+    if not token_clauses:
+        token_clauses = "1 = 1"
 
-    matches = catalog[starts_with | contains | token_match].copy() # combine all matched candidates, with potential duplicates if a name matches multiple criteria
-    if matches.empty:
-        return matches[["item_id", "item_name"]]
+    query_sql = text(
+        f"""
+        SELECT
+            item_id,
+            item_name
+        FROM {DB_CONFIG["database"]}.GAME_DATA
+        WHERE
+            LOWER(item_name) LIKE :prefix_query
+            OR LOWER(item_name) LIKE :like_query
+            OR ({token_clauses})
+        ORDER BY
+            CASE
+                WHEN LOWER(item_name) LIKE :prefix_query THEN 0
+                WHEN ({token_clauses}) THEN 1
+                ELSE 2
+            END,
+            CHAR_LENGTH(item_name),
+            item_name,
+            item_id
+        LIMIT :limit
+        """
+    )
+    params = {
+        "prefix_query": f"{normalized_query}%",
+        "like_query": f"%{normalized_query}%",
+        "limit": int(limit),
+    }
+    for idx, token in enumerate(normalized_query.split()):
+        params[f"token_{idx}"] = f"%{token}%"
+    return pd.read_sql(query_sql, engine, params=params)
 
-    matches["match_rank"] = ( # rank: strict prefix match > token-based match > loose substring match
-        (~starts_with.loc[matches.index]).astype(int) * 2 +
-        (~contains.loc[matches.index]).astype(int)
-    )
-    matches["name_len"] = matches["normalized_name"].str.len() # secondary sort by name length to prioritize shorter names when match_rank is the same
-    matches = matches.sort_values(
-        ["match_rank", "name_len", "item_name", "item_id"],
-        ascending=[True, True, True, True]
-    )
-    return matches.head(limit)[["item_id", "item_name"]]
 
 @app.get("/api/search/games")
 def search_games():
@@ -373,8 +292,8 @@ def recommend_game():
     try:
         candidates = build_cb_candidates(
             item_id=item_id,
-            engine=create_engine(get_db_url()),
-            similarity_pool_size=DEFAULT_CB_POOL_SIZE,
+            engine=engine,
+            candidate_pool_size=DEFAULT_CB_POOL_SIZE,
         )
     except Exception as exc:
         return jsonify({"results": [], "message": f"Failed to load similar games: {exc}"}), 500
@@ -382,13 +301,11 @@ def recommend_game():
     if candidates.empty:
         return jsonify({"results": [], "message": "No similar games found for this title."})
 
-
     # candidate games BEFORE re-ranking are stored in cache to be used for re-ranking when user adjusts weights
     cached_search = _store_cached_search(
         mode="game",
         candidates_df=candidates,
-        base_score_column="similarity_score",
-        base_weight_key="w_anchor_sim",
+        base_weight_key="w_cb",
         context={"item_id": item_id},
     )
     return _build_ranked_response(cached_search, weights)
@@ -417,6 +334,7 @@ def recommend_user():
         return jsonify({"results": [], "message": f"No owned games found for {steam_id}."})
 
     candidates = build_cf_candidates(
+        engine=engine,
         live_interactions_df=interactions_df,
         runtime=runtime,
     )
@@ -429,11 +347,15 @@ def recommend_user():
     cached_search = _store_cached_search(
         mode="user",
         candidates_df=candidates,
-        base_score_column="cf_score",
         base_weight_key="w_cf",
         context={"steam_id": steam_id},
     )
     return _build_ranked_response(cached_search, weights)
+
+
+# ==========================
+# Re-reranking based candidates
+# ==========================
 
 
 @app.post("/api/recommend/rerank")
@@ -453,6 +375,7 @@ def rerank_search():
         }), 404
 
     return _build_ranked_response(cached_search, weights)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

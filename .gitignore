@@ -4,27 +4,26 @@ __pycache__/
 .ipynb_checkpoints/
 
 *.csv
-*.tsv
-*.parquet
-*.pkl
-*.joblib
 *.json
 *.npz
 *.npy
 *.zip
 
-!savefiles/item_id_to_idx_als.json
-!savefiles/items_used.parquet
-!savefiles/item_factors.npy
+!tables/production/item_id_to_idx_als.json
+!tables/production/item_factors.npy
 
-src/___*
+src/*.ipynb
+src/__get_steam_API.py
 
-sql_script/generated/
+sql_script/cloud_load/
 sql_script/*_cloud.sql
-
+sql_script/*_cloud_single.sql
 scripts/
 
 staging_checks.md
 staging_tables_summary.md
 
 .env
+.DS_Store/
+
+_.txt

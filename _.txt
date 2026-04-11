@@ -1,0 +1,15 @@
+Help me set up a Cron Job in this project. 
+
+First, make sure the Vercel CLI is installed (`npm i -g vercel`). 
+
+If I'm using Claude Code or Cursor, install the Vercel Plugin (`npx plugins add vercel/vercel-plugin`). 
+
+For other agents, install Vercel Skills (`npx skills add vercel-labs/agent-skills`). 
+
+Then: 
+1. Create a Vercel Function at app/api/cron/route.ts that runs a scheduled task. 
+2. Add a cron schedule to vercel.json that triggers this function on a recurring schedule. 
+3. Run `vercel env pull` to sync environment variables locally. 
+4. Deploy with `vercel --prod` and use `vercel inspect` to verify the cron job is configured.
+
+Great. Now, I want you to modify the current README.md that is for the previous version (in "main" branch) so that it reflects the current pipeline. Be as detail as possible and avoid using phrases that may indicate that this is the second version. So don't use something like "The pipeline now...", "It is no longer...", etc.

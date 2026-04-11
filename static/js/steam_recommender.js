@@ -1,4 +1,4 @@
-const { useEffect, useMemo, useState } = React;
+const { useMemo, useState } = React;
 
 const INITIAL_WEIGHTS = {
   popularity: 0.5,
@@ -77,14 +77,14 @@ function TopBar({ onHomeClick, showHomeButton = false }) {
           Go to project repo
         </a>
         <div className="divider" />
-        <div className="nav-badge">steamrec@v1.0</div>
+        <div className="nav-badge">steamrec@v2.0</div>
       </div>
     </nav>
   );
 }
 
 function GameCard({ game }) {
-  const tags = [...(game.tags || []), ...(game.genres || [])].slice(0, 6);
+  const tags = (game.tags || []).slice(0, 6);
 
   return (
     <div className="game-card">
@@ -186,7 +186,7 @@ function App() {
   const allTagCounts = useMemo(() => {
     const counts = {};
     games.forEach((game) => {
-      [...(game.tags || []), ...(game.genres || [])].forEach((tag) => {
+      (game.tags || []).forEach((tag) => {
         counts[tag] = (counts[tag] || 0) + 1;
       });
     });
@@ -203,38 +203,9 @@ function App() {
       return games;
     }
     return games.filter((game) =>
-      [...(game.tags || []), ...(game.genres || [])].some((tag) => activeTags.has(tag))
+      (game.tags || []).some((tag) => activeTags.has(tag))
     );
   }, [activeTags, games]);
-
-  useEffect(() => {
-    if (mode !== "game") {
-      setGameSuggestions([]);
-      setGameSearchLoading(false);
-      return undefined;
-    }
-
-    const query = inputValue.trim();
-    if (!query) {
-      setGameSuggestions([]);
-      setGameSearchLoading(false);
-      return undefined;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      setGameSearchLoading(true);
-      try {
-        const data = await fetchJson(`/api/search/games?q=${encodeURIComponent(query)}`);
-        setGameSuggestions(data.results || []);
-      } catch (err) {
-        setGameSuggestions([]);
-      } finally {
-        setGameSearchLoading(false);
-      }
-    }, 180);
-
-    return () => clearTimeout(timeoutId);
-  }, [inputValue, mode]);
 
   function toggleTag(tag) {
     setActiveTags((prev) => {
@@ -339,6 +310,36 @@ function App() {
     }
   }
 
+  async function fetchGameSuggestions(query) {
+    if (mode !== "game") {
+      return;
+    }
+
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setGameSuggestions([]);
+      setGameSearchLoading(false);
+      return;
+    }
+
+    setGameSearchLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const data = await fetchJson(`/api/search/games?q=${encodeURIComponent(trimmed)}`);
+      setGameSuggestions(data.results || []);
+      if (!data.results || data.results.length === 0) {
+        setError("No matching games found. Try a different title.");
+      }
+    } catch (err) {
+      setGameSuggestions([]);
+      setError(err.message || "Failed to fetch game options.");
+    } finally {
+      setGameSearchLoading(false);
+    }
+  }
+
   function handleSearch() {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
@@ -353,14 +354,7 @@ function App() {
       return;
     }
 
-    if (gameSuggestions.length > 0) {
-      runGameSearch(gameSuggestions[0], weights);
-      return;
-    }
-
-    setError("Pick one of the game suggestions to run game-based recommendations.");
-    setGames([]);
-    setPage("results");
+    fetchGameSuggestions(trimmed);
   }
 
   function handleKey(event) {
@@ -374,6 +368,8 @@ function App() {
     setInputValue(value);
     setError("");
     setMessage("");
+    setGameSuggestions([]);
+    setGameSearchLoading(false);
     if (!selectedGame || selectedGame.name !== value) {
       setSelectedGame(null);
     }
@@ -476,7 +472,7 @@ function App() {
               <input
                 className="search-input"
                 type="text"
-                placeholder={mode === "user" ? "Enter Steam 64-bit user ID" : "Type a game name & pick one below"}
+                placeholder={mode === "user" ? "Enter Steam 64-bit user ID" : "Type a game name"}
                 value={inputValue}
                 onChange={(event) => handleInputChange(event.target.value)}
                 onKeyDown={handleKey}
@@ -499,15 +495,12 @@ function App() {
               </div>
             )}
 
-            <div className={`status-message${error ? " error-message" : ""}`}>
-              {/* {mode === "user"
-                ? "Game database is per 2022. This will be updated in the future versions."
-                : "Game database is per 2022. This will be updated in the future versions."} */}
-              <span>Game database is per 2022.</span>
-            </div>
-            <div className={`status-message${error ? " error-message" : ""} status-message-sub`}>
+            {/* <div className={`status-message${error ? " error-message" : ""}`}>
+              <span>{mode === "game" ? "Type game name and click Search to see the options." : "Enter Steam 64-bit user ID."}</span>
+            </div>*/}
+            {/* <div className={`status-message${error ? " error-message" : ""} status-message-sub`}>
               <span>This will be updated in future versions.</span>
-            </div>
+            </div>*/}
           </div>
         </div>
       </>
