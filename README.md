@@ -16,6 +16,7 @@ For excellent exercise on building a recommender system from scratch with Python
 At its heart, a recommender system relies on two types of data: the items and user interactions (for collaborative-filtering technique). In this project, items are games available on Steam whilst user interactions could take various forms such as whether the user recommends the game, their total playtime, what's in their wishlist, etc. For content-based filtering technique, the recommender will filter, out of the whole catalog, games that are most similar to the game in question based on their contents such as tags and genres. For collaborative-filtering technique, the recommender will evaluate whether a user would like a game based on other similar users that play similar games. Following this, the deployed app uses two complementary recommendation paths:
 - A content-based recommender that retrieves similar games based on games' metadata.
 - A collaborative-filtering recommender that folds a live Steam library into a pretrained ALS latent space and ranks the games from the item latent factors.
+
 The frontend layer then has two search modes based on these two techniques:
 - `Game-based search`: enter a game title, retrieve the closest catalog neighbors, and rerank them.
 - `Steam-ID search`: fetch a user's owned games from the Steam Web API, infer interaction strength from playtime, fold the user into the ALS space, and rerank the candidate pool.
@@ -129,7 +130,7 @@ Default recommendation settings live in [`src/config.py`](src/config.py):
 ## Structure
 
 ```text
-Steam Recommender/
+SteamRec/
 ├── app.py
 ├── README.md
 ├── requirements.txt
@@ -158,7 +159,7 @@ Steam Recommender/
 
 ## Data Inputs
 
-The pipeline expects raw source files under [`tables/raw`](tables/raw) and these can be downloaded from [HERE][Steam Games Dataset from Kaggle](https://www.kaggle.com/datasets/fronkongames/steam-games-dataset) for the game details and [HERE](https://www.kaggle.com/datasets/e2355a9b846ac37e77dc85210d20656dc8c20f349b7c30d6b6433348e959c484) for the user reviews. Alternatively using Kaggle CLI
+The pipeline expects raw source files under [`tables/raw`](tables/raw) and these can be downloaded from [HERE](https://www.kaggle.com/datasets/fronkongames/steam-games-dataset) for the game details and [HERE](https://www.kaggle.com/datasets/e2355a9b846ac37e77dc85210d20656dc8c20f349b7c30d6b6433348e959c484) for the user reviews. Alternatively using Kaggle CLI
 ``` 
 #!/bin/bash
 kaggle datasets download fronkongames/steam-games-dataset
@@ -242,7 +243,6 @@ The collaborative-filtering pipeline is then:
 2. Convert it into an implicit-feedback confidence matrix using $c_{ui} = 1 + \alpha r_{ui}$.
 3. Train ALS to learn latent factors for users and items. In practice, the pipeline stores only the item latent factors and reconstructs a live user's latent vector at request time.
 4. When a user enters a Steam ID from the web app, it will fetch their owned games from [Steam Web API: `IPlayerService/GetOwnedGames`](https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/). 
-    > ⚠️ IMPORTANT ⚠️ Since the endpoint provides ownership and playtime but not review recommendations, the current online pipeline treats owned games as positive interactions when forming live inputs. This behavior is actually not proper, used only for convenience. In the future, this will be patched.
 5. Fold the live user into the pretrained item-factor space. If $Y$ is the matrix of item latent factors, the user vector $\mathbf{x}_u$ is solved from the observed items by a regularized linear system of the form:
 
 ```math
@@ -302,7 +302,6 @@ Reading sources:
 Pipeline-specific implementation:
 
 - [Steam Web API: `IPlayerService/GetOwnedGames`](https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/)
-- [Game Recommendations on Steam Dataset (Kaggle)](https://www.kaggle.com/datasets/antonkozyriev/game-recommendations-on-steam)
 - [benfred/implicit](https://github.com/benfred/implicit)
 
 ## Author's Remarks
