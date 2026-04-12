@@ -236,20 +236,20 @@ def main() -> None:
     save_item_similarity_csv(OUTPUT_SIMILARITY_FILE, df, X)
     save_csv(score_df, OUTPUT_RERANK_FILE)
 
-    # confidence_matrix, item_id_to_idx_als = build_review_matrix(df) # from GAME_REVIEW.csv
+    confidence_matrix, item_id_to_idx_als = build_review_matrix(df) # from GAME_REVIEW.csv
 
-    # del df
-    # gc.collect()
+    del df
+    gc.collect()
 
-    # model = train_als(confidence_matrix)
-    # # this won't be saved to SQL because we need the full vectors to compute similarities; see recommender.py
-    # save_runtime_artifacts(
-    #     OUTPUT_GAME_FACTORS_DIR,
-    #     item_factors=model.item_factors,
-    #     item_id_to_idx_als=item_id_to_idx_als,
-    # )
-    # print(f"Shape of item factors: {model.item_factors.shape}")
-    # print(f"[runtime] Wrote runtime artifacts to {OUTPUT_GAME_FACTORS_DIR}")
+    model = train_als(confidence_matrix)
+    # this won't be saved to SQL because we need the full vectors to compute similarities; see recommender.py
+    save_runtime_artifacts(
+        OUTPUT_GAME_FACTORS_DIR,
+        item_factors=model.item_factors,
+        item_id_to_idx_als=item_id_to_idx_als,
+    )
+    print(f"Shape of item factors: {model.item_factors.shape}")
+    print(f"[runtime] Wrote runtime artifacts to {OUTPUT_GAME_FACTORS_DIR}")
 
 if __name__ == "__main__":
     main()
