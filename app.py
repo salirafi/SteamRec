@@ -377,5 +377,12 @@ def rerank_search():
     return _build_ranked_response(cached_search, weights)
 
 
+
+# for cron job
+@app.route("/ping")
+def ping():
+    return {"status": "ok"}, 200
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

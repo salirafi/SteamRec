@@ -143,7 +143,7 @@ function GameCard({ game }) {
 }
 
 function SliderRow({ label, desc, value, onChange, onRelease }) {
-  const pct = `${value * 100}%`;
+  const pct = `${(value / 10) * 100}%`;
 
   return (
     <div className="slider-item">
@@ -155,7 +155,7 @@ function SliderRow({ label, desc, value, onChange, onRelease }) {
       <input
         type="range"
         min="0"
-        max="1"
+        max="10"
         step="0.01"
         value={value}
         style={{ "--pct": pct }}
